@@ -1,154 +1,241 @@
-/*获取对象*/
-function $(s) {
-    return document.querySelectorAll(s);
-}
-var lis = $("#list li");
-for (var i = 0; i < lis.length; i++) {
-    lis[i].onclick = function () {
-        for (var j = 0; j < lis.length; j++) {
-            lis[j].className = "";
+!function(){
+	var $ = function(s){return document.querySelector(s);}
+	var box = $("#canvas");
+	var canvas = document.createElement("canvas");
+	var ctx = canvas.getContext("2d");
 
-        }
-        this.className = "selected";
-        load("/media/" + this.title);//点击歌名就向服务器请求
-    }
-}
+	box.appendChild(canvas);
+	
+	var HEIGHT,//canvas高
+	    WIDTH;//canvs 宽
+	
+	var SIZE = 32;//音乐片段数
+	
+	var ARR = [];//该数组保存canvas中各图形的x,y坐标以及他们的颜色
+	ARR.dotMode = "random";
+	var isMobile = false;
+	var isApple = false;
+	
+	!function(){
+		var u = window.navigator.userAgent;
+		var m = /(Android)|(iPhone)|(iPad)|(iPod)/i;
+		if(m.test(u)){
+			isMobile = true;
+		}
+		var ap = /(iPhone)|(iPad)|(iPod)|(Mac)/i;
+		if(ap.test(u)){
+			isApple = true;
+		}
+	}();
+	
+	//Android和苹果设备则设置音乐片段为16
+	isMobile && (SIZE = 16);
+	
+	//初始化heigth，width以及canvas的宽高
+	function init(){
+		HEIGHT = box.clientHeight,
+		WIDTH = box.clientWidth;
+		canvas.height = HEIGHT;
+		canvas.width = WIDTH;
+		ctx.globalCompositeOperation = "lighter";
+		ctx.lineWidth = (HEIGHT > WIDTH ? WIDTH : HEIGHT) / 30;
+		getArr();
+	}
+	
+	init();
+	/*
+	 *  获取[min ,max]之间的随机数
+	 *  若无参数则min = 0，max = 1
+	 *	max < min 则返回 0
+	*/
+	function random(min, max){
+		min = min || 0;
+		max = max || 1;
+		return max >= min ? Math.round(Math.random()*(max - min) + min) : 0;
+	}
+	
+	function getArr(){
+		//创建线性渐变对象，以便绘制柱状图使用
+		ARR.length = 0;
+		ARR.linearGradient = ctx.createLinearGradient(0, HEIGHT, 0, 0);
+		ARR.linearGradient.addColorStop(0, 'green');
+		ARR.linearGradient.addColorStop(0.5, '#ff0');
+		ARR.linearGradient.addColorStop(1, '#f00');	
+	
+		for(var i = 0;i < SIZE; i++){
+			var x =  random(0, WIDTH),
+				y = random(0, HEIGHT),
+				color = 'rgba('+random(100, 250)+','+random(50, 250)+','+random(50, 100)+',0)',
+				ran = random(1, 8) * 0.2;
+			ARR.push({
+				x: x,
+				y: y,
+				color: color,
+				dx: ARR.dotMode == "random" ? ran : 0,
+				dx2: ran,
+				dy: random(1, 5),
+				cap: 0,
+				cheight : 10
+			});
+		}
+	}
+	
+	//窗口resize则重新计算heigth，width以及canvas的宽高
+	window.onresize = init;
+	
+	function Render(){	
+		var o = null;	
+		return function(del, ave){
+			ctx.fillStyle = ARR.linearGradient;
+			var w = Math.round(WIDTH / SIZE),
+			cgap = Math.round(w * 0.3);
+			cw = w - cgap;
+			ctx.clearRect(0, 0, WIDTH, HEIGHT);
+			if(Render.type == 'Dot' && ((del > 3 && ave > 30) || (ave > 50 && del > 0)) ){
+				var d = Math.round(del * (ave - 20) * 0.01)+4;
+				for(var i = 0; i < d; i++){
+					var y = random(-HEIGHT * 2, 3*HEIGHT);
+					ctx.beginPath();
+					ctx.moveTo(0, y);		
+					ctx.lineTo(WIDTH, HEIGHT - y);
+					ctx.strokeStyle = 'rgb('+random(100, 250)+','+random(50, 250)+','+random(50, 100)+')';
+					ctx.stroke();
+				}
+				//if(del > 3){alert(del + ' == ' + ave)}
+				//$('.type .selected').innerHTML = del + '=' + ave;
+			}
+			for(var i = 0; i < SIZE; i++){		
+				o = ARR[i];
+				if(Render.type == 'Dot'){
+					//ctx.strokeStyle = ARR[i].color.replace(",0",","+this[i]/270);
+					var x = o.x,
+					y = o.y,
+					r = Math.round((this[i]/2+18)*(HEIGHT > WIDTH ? WIDTH : HEIGHT)/(isMobile ? 450 : 600));
+					o.x += o.dx;
+					//o.x += 2;
+					o.x > WIDTH && (o.x = 0);
+	
+					//开始路径，绘画圆
+					ctx.beginPath();
+					ctx.arc(x, y, r, 0, Math.PI * 2, true);
+			    	var gradient = ctx.createRadialGradient(x, y, 0, x, y, r);
+				    gradient.addColorStop(0, "rgb(255,255,255)");
+	
+				    //var per = this[i]/(isMobile ? 160 : 250);
+				    //per = per > 1 ? 1 : per;
+	
+				    //gradient.addColorStop(per, o.color.replace("opacity",1-this[i]/(isMobile ? 160 : 220)));
+				    gradient.addColorStop(1, o.color);
+				    /*for(var j = 0, l = Math.round(this[i]/10); j < l; j++){
+				    	//ctx.beginPath();
+				    	ctx.moveTo(x ,y);
+				    	ctx.quadraticCurveTo(x+random(-30, 30), y+random(-30, 30), random(x + 100), random(y + 100));			    	
+				    }
+				    //ctx.stroke();*/
+				    ctx.fillStyle = gradient;
+				    ctx.fill();			    
+				}
+				if(Render.type == 'Column'){
+					var h = this[i] / 280 * HEIGHT;
+					ARR[i].cheight > cw && (ARR[i].cheight = cw);
+					if(--ARR[i].cap < ARR[i].cheight){
+						ARR[i].cap = ARR[i].cheight;
+					};
+					if(h > 0 && (ARR[i].cap < h + 40)){
+						ARR[i].cap = h + 40 > HEIGHT ? HEIGHT : h + 40;
+					}
+					//console.log(ARR[i].cap);
+					ctx.fillRect(w * i, HEIGHT - ARR[i].cap, cw, ARR[i].cheight);			
+					ctx.fillRect(w * i, HEIGHT - h, cw, h);
+				}
+				
+			}
+		}
+	}
+	
+	Render.type = "Dot";
+	var lis = document.querySelectorAll(".music-list li");
+	var visualizer = new MusicVisualizer({
+		size: SIZE, 
+		onended: function(){
+			if($(".play")){
+				$(".play").nextElementSibling ? $(".play").nextElementSibling.click() : lis[0].click();
+			}else{
+				lis[0].click();
+			}
+		},
+		visualizer: Render()
+	});
+	
+	!function(){
+		for(var i = 0; i < lis.length; i++){
+			lis[i].onclick = function(){
+				visualizer.play('/media/' + this.title, isMobile);
+				var play = $("li.play");
+				play && (play.className = "");
+				this.className = "play";
+			}
+		}
+	}()
+	
+	$("#add").onclick = function(){
+		$("#upload").click();
+	}
+	
+	if(isApple){
+		if(isMobile){
+			$("#volume").className = "range";
+		}
+		$("#add").style.display = "none";
+		$("#music-list").style.top = 0;
+		
+		$("#loading-box").style.display = "block";
+		visualizer.addinit(function(){
+			$("#loading").style.display = "none";
+			$("#play").style.display = "block";
+		});
+		$("#play").onclick = function(){
+			$("#loading-box").style.display = "none";
+			visualizer.start();
+		}
+	};
+	
+	lis[0].click();
 
-/**创建ajax异步请求 */
-var xhr = new XMLHttpRequest();
-/* 创建AudioContext对象*/
-var ac = new (window.AudioContext || window.webkitAudioContext)();
-var gainNode = ac[ac.createGain ? "createGain" : "createGainNode"]();/*改变音频大小对象*/
-gainNode.connect(ac.destination);//连接到destination
-
-var analyser = ac.createAnalyser();//分析音频对象
-var size = 128;
-analyser.fftSize = size * 2;
-analyser.connect(gainNode);
-
-var source = null;
-var count = 0;
-var box = $("#box")[0];
-var height, width;
-var canvas = document.createElement("canvas");
-var ctx = canvas.getContext("2d");
-box.appendChild(canvas);
-var Dots = [];
-function random(m, n) {
-    return Math.round(Math.random() * (n - m) + m);
-}
-function getDots() {
-    Dots = [];
-    for (var i = 0; i < size; i++) {
-        var x = random(0, width);
-        var y = random(0, height);
-        var color = "rbg(" + random(0, 255) + "," + random(0, 255) + "," + random(0, 255) + ")";
-        Dots.push({
-            x: x,
-            y: y,
-            color: color
-        });
-    }
-}
-var line;//全局变量，解决换了dot模式回不来
-function resize() {
-    height = box.clientHeight;
-    width = box.clientWidth;
-    canvas.height = height;
-    canvas.width = width;
-    line = ctx.createLinearGradient(0, 0, 0, height);
-    line.addColorStop(0, "red");
-    line.addColorStop(0.5, "yellow");
-    line.addColorStop(1, "green");
-  
-    getDots();
-}
-resize();
-window.onresize = resize;
-
-function draw(arr) {
-    ctx.clearRect(0, 0, width, height);
-    var w = width / size;
-    ctx.fillStyle = line;
-    for (var i = 0; i < size; i++) {
-        if (draw.type == "column") {
-            var h = arr[i] / 256 * height;
-            ctx.fillRect(w * i, height - h, w * 0.6, h);
-        } else if (draw.type == "dot") {
-            ctx.beginPath();//告诉浏览器重新绘图
-            var o = Dots[i];
-            var r = arr[i] / 256 * 50;
-            ctx.arc(o.x, o.y, r, 0, Math.PI * 2, true);
-            var g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, r);
-            g.addColorStop(0, "#fff");
-            g.addColorStop(1,"#4e4e4e");
-            ctx.fillStyle = g;
-            ctx.fill();
-            // ctx.strokeStyle = "#fff";
-            // ctx.stroke();
-        }
-    }
-}
-draw.type = "column";
-var types = $("#type li");
-for (var i = 0; i < types.length; i++) {
-    types[i].onclick = function () {
-        for (var j = 0; j < types.length; j++) {
-            types[j].className = "";
-        }
-        this.className = "selected";
-        draw.type = this.getAttribute("data-type");
-    }
-}
-
-function load(url) {
-    var n = ++count;
-    source && source[source.stop ? "stop" : "noteOff"]();
-    xhr.abort();//停止上一次请求，不过上一次有没有
-    xhr.open("GET", url);
-    xhr.responseType = "arraybuffer";
-    xhr.onload = function () {
-        if (n != count) {
-            return;
-        }
-        /*将异步请求回来的二进制资源解码*/
-        ac.decodeAudioData(xhr.response, function (buffer) {
-            if (n != count) {
-                return;
-            }
-            var bufferSource = ac.createBufferSource();/*创建bufferSource对象*/
-            bufferSource.buffer = buffer;
-            bufferSource.connect(analyser);
-            bufferSource[bufferSource.start ? "start" : "noteOn"](0);
-            source = bufferSource;
-        }, function (err) {
-            console.log(err);
-        })
-    }
-    xhr.send();
-}
-
-function visualizer() {
-    /*将分析得到的数据传给数组arr */
-    var arr = new Uint8Array(analyser.frequencyBinCount);
-
-    requestAnimationFrame = window.requestAnimationFrame ||
-        window.webkitRequestAnimationFrame ||
-        window.mozRequestAnimationFrame;
-    function v() {
-        analyser.getByteFrequencyData(arr);
-        //console.log(arr);
-        draw(arr);
-        requestAnimationFrame(v);
-    }
-    requestAnimationFrame(v);
-}
-visualizer();
-/*调音量 */
-function changeVolume(percent) {
-    gainNode.gain.value = percent * percent;
-}
-$("#volume")[0].onchange = function () {
-    changeVolume(this.value / this.max);
-}
-$("#volume")[0].onchange();
+	$("#upload").onchange = function(){
+		var file = this.files[0];
+		var fr = new FileReader();
+	
+		fr.onload = function(e){
+			visualizer.play(e.target.result);
+		}
+		fr.readAsArrayBuffer(file);
+		$(".play") && ($(".play").className = "");
+	}
+	
+	!function(){
+		var types = document.querySelectorAll(".type li");
+		for(var i = 0; i < types.length; i++){
+			types[i].onclick = function(){
+				for(var j = 0; j < types.length; j++){
+					types[j].className = "";
+				}
+				this.className = "selected"
+				Render.type = this.innerHTML;
+			}
+		}
+	}()
+	
+	canvas.onclick = function(){
+		if(Render.type == 'Dot'){
+			for(var i = 0;i < SIZE; i++){
+				ARR.dotMode == "random" ? ARR[i].dx = 0 : ARR[i].dx = ARR[i].dx2;
+			}
+			ARR.dotMode = ARR.dotMode == "static" ? "random" : "static";
+		}
+	}
+	$("#volume").oninput = function(){
+		visualizer.changeVolume(this.value/this.max);
+	}
+	$("#volume").oninput();
+}()
