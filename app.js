@@ -60,5 +60,5 @@ app.use(function(err, req, res, next) {
         error: {}
     });
 });
-
+console.log('好久不见')
 module.exports = app;
