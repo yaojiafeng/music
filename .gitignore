@@ -1,2 +1,3 @@
 #忽略css文件
 public/stylesheets/*.css
+node_modules
